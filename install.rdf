@@ -6,7 +6,8 @@
 <em:id>{f1328e8c-fe49-11e5-9a7a-0015f2381860}</em:id>
 <em:name>Link Style</em:name>
 <em:version>1</em:version>
-
+<em:bootstrap>true</em:bootstrap>
+  
 <em:targetApplication>
 <Description>
 <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
