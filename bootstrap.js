@@ -3,6 +3,16 @@ var history_version = 0;
 
 Components.utils.import("resource://gre/modules/Services.jsm");
 
+function top_tab() {
+	return Services.wm.getMostRecentWindow("navigator:browser").content.content;
+}
+
+function for_each_open_window(func) {
+	var windows = Services.wm.getEnumerator("navigator:browser");
+	while (windows.hasMoreElements())
+	    func(windows.getNext().QueryInterface(Components.interfaces.nsIDOMWindow));
+}
+
 function make_visited_links(links, base_uri_string) {
 	if (links.length == 0)
 		return;
@@ -59,48 +69,12 @@ function make_visited_document_and_frames(w) {
 		make_visited_document(w.frames[i].document);
 }
 
-function init_history_listener() {
-	history_observer = {
-		onBeginUpdateBatch: function () { },
-		onEndUpdateBatch: function () { },
-		onTitleChanged: function (aURI, aPageTitle) { },
-		onDeleteURI: function (aURI) { },
-		onClearHistory: function () { },
-		onPageChanged: function (aURI, aWhat, aValue) { },
-		onPageExpired: function (aURI, aVisitTime, aWholeEntry) { },
-		onVisit: function (aURI, aVisitID, aTime, aSessionID, aReferringID, aTransitionType) {
-			history_version++;
-		},
-		QueryInterface: function (iid) {
-			if (iid.equals(Components.interfaces.nsINavHistoryObserver) || iid.equals(Components.interfaces.nsISupports))
-				return this;
-			throw Components.result.NS_ERROR_NO_INTERFACE;
-		},
-	};
-
-	var history = Components.classes["@mozilla.org/browser/nav-history-service;1"].getService(Components.interfaces.nsINavHistoryService);
-	history.addObserver(history_observer, false);
-}
-
-function top_window() {
-	return Services.wm.getMostRecentWindow("navigator:browser").content;
-}
-
 function focus_listener(e) {
-	console.log("focus");
-	if (e.target.defaultView)
+	if (e.target instanceof Components.interfaces.nsIDOMHTMLDocument)
 		make_visited_document_and_frames(e.target.defaultView);
 }
 
-function load_listener(e) {
-	console.log("load");
-	// DOMContentLoaded does not occur for plain images
-	// update links on current window, not event target
-	make_visited_document_and_frames(top_window());
-}
-
 function dcom_content_loaded_listener(e) {
-	console.log("dcom content loaded");
 	// watch for changes to pages loading additional content
 	// containing links after initial content load is complete
 	e.target.ls_observer = new e.target.defaultView.MutationObserver(function (mutations) {
@@ -117,31 +91,57 @@ function dcom_content_loaded_listener(e) {
 	});
 	e.target.ls_observer.observe(e.target, { childList: true, subtree: true });
 
-	// if event is for the current visible document, we have already
-	// received focus event and run an update for this document, even
-	// though it was not fully loaded. make sure it is updated again.
-	if (e.target.defaultView == top_window())
-		e.target.ls_history_version = -1;
-
-	// update links on current window, not event target
-	make_visited_document_and_frames(top_window());
+	make_visited_document_and_frames(top_tab());
 }
 
 function init(window) {
-	window.addEventListener("focus", focus_listener);
-	window.addEventListener("load", load_listener, true);
-	window.addEventListener("DOMContentLoaded", dcom_content_loaded_listener);
-	make_visited_document_and_frames(top_window());
+	window.addEventListener("focus", focus_listener, true);
+	window.addEventListener("DOMContentLoaded", dcom_content_loaded_listener, true);
+	make_visited_document_and_frames(top_tab());
 }
 
 function deinit(window) {
-	window.removeEventListener("focus", focus_listener);
-	window.removeEventListener("load", load_listener);
-	window.removeEventListener("DOMContentLoaded", dcom_content_loaded_listener);
+	window.removeEventListener("focus", focus_listener, true);
+	window.removeEventListener("DOMContentLoaded", dcom_content_loaded_listener, true);
 }
 
+var window_listener = {
+	onOpenWindow: function(xul_window) {
+		var window = xul_window.QueryInterface(Components.interfaces.nsIInterfaceRequestor).getInterface(Components.interfaces.nsIDOMWindow);
+
+		function on_window_load() {
+			window.removeEventListener("load", on_window_load);
+			if (window.document.documentElement.getAttribute("windowtype") == "navigator:browser")
+				init(window);
+		}
+		window.addEventListener("load", on_window_load);
+	},
+	onCloseWindow: function (xul_window) { },
+	onWindowTitleChange: function (xul_window, new_title) { }
+};
+
 function startup(data, reason) {
-	init_history_listener();
+	history_observer = {
+		onBeginUpdateBatch: function () { },
+		onEndUpdateBatch: function () { },
+		onTitleChanged: function (aURI, aPageTitle) { },
+		onDeleteURI: function (aURI) { },
+		onClearHistory: function () { },
+		onPageChanged: function (aURI, aWhat, aValue) { },
+		onPageExpired: function (aURI, aVisitTime, aWholeEntry) { },
+		onVisit: function (aURI, aVisitID, aTime, aSessionID, aReferringID, aTransitionType) {
+			history_version++;
+			make_visited_document_and_frames(top_tab());
+		},
+		QueryInterface: function (iid) {
+			if (iid.equals(Components.interfaces.nsINavHistoryObserver) || iid.equals(Components.interfaces.nsISupports))
+				return this;
+			throw Components.result.NS_ERROR_NO_INTERFACE;
+		},
+	};
+	var history = Components.classes["@mozilla.org/browser/nav-history-service;1"].getService(Components.interfaces.nsINavHistoryService);
+	history.addObserver(history_observer, false);
+
 	for_each_open_window(init);
 	Services.wm.addListener(window_listener);
 }
@@ -160,24 +160,3 @@ function shutdown(data, reason) {
 function install(data, reason) { }
 
 function uninstall(data, reason) { }
-
-function for_each_open_window(func) {
-	var windows = Services.wm.getEnumerator("navigator:browser");
-	while (windows.hasMoreElements())
-	    func(windows.getNext().QueryInterface(Components.interfaces.nsIDOMWindow));
-}
-
-var window_listener = {
-	onOpenWindow: function(xul_window) {
-		var window = xul_window.QueryInterface(Components.interfaces.nsIInterfaceRequestor).getInterface(Components.interfaces.nsIDOMWindow);
-
-		function on_window_load() {
-			window.removeEventListener("load", on_window_load);
-			if (window.document.documentElement.getAttribute("windowtype") == "navigator:browser")
-				init(window);
-		}
-		window.addEventListener("load", on_window_load);
-	},
-	onCloseWindow: function (xul_window) { },
-	onWindowTitleChange: function (xul_window, new_title) { }
-};
