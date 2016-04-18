@@ -124,12 +124,12 @@ function startup(data, reason) {
 	history_observer = {
 		onBeginUpdateBatch: function () { },
 		onEndUpdateBatch: function () { },
-		onTitleChanged: function (aURI, aPageTitle) { },
-		onDeleteURI: function (aURI) { },
+		onTitleChanged: function (uri, page_title) { },
+		onDeleteURI: function (uri) { },
 		onClearHistory: function () { },
-		onPageChanged: function (aURI, aWhat, aValue) { },
-		onPageExpired: function (aURI, aVisitTime, aWholeEntry) { },
-		onVisit: function (aURI, aVisitID, aTime, aSessionID, aReferringID, aTransitionType) {
+		onPageChanged: function (uri, what, value) { },
+		onPageExpired: function (uri, visit_time, whole_entry) { },
+		onVisit: function (uri, visit_id, time, session_id, referring_id, transition_type) {
 			history_version++;
 			make_visited_document_and_frames(top_tab());
 		},
