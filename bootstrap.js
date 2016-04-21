@@ -17,7 +17,7 @@ function make_visited_links(links, base_uri_string) {
 	if (links.length == 0)
 		return;
 
-	console.log("make_visited_links: " + links.length);
+	//console.log("make_visited_links: " + links.length);
 
 	var io = Components.classes["@mozilla.org/network/io-service;1"].getService(Components.interfaces.nsIIOService);
 	var base_uri = io.newURI(base_uri_string, null, null)
@@ -40,13 +40,10 @@ function make_visited_links(links, base_uri_string) {
 		var count = result.root.childCount;
 		result.root.containerOpen = false;
 
-		if (count > 0) {
-			links[i].style.opacity = 0.4;
-			//links[i].style.textDecoration = "underline line-through";
-		} else {
+		if (count > 0)
+			links[i].style.opacity = 0.5;
+		else
 			links[i].style.opacity = 1.0;
-			//links[i].style.textDecoration = "underline";
-		}
 	}
 }
 
@@ -70,13 +67,14 @@ function make_visited_document_and_frames(w) {
 }
 
 function focus_listener(e) {
+	//console.log("focus");
 	if (e.target instanceof Components.interfaces.nsIDOMHTMLDocument)
 		make_visited_document_and_frames(e.target.defaultView);
 }
 
 function dcom_content_loaded_listener(e) {
-	// watch for changes to pages loading additional content
-	// containing links after initial content load is complete
+	//console.log("dcom content loaded");
+	// watch for changes to pages loading additional content containing links
 	e.target.ls_observer = new e.target.defaultView.MutationObserver(function (mutations) {
 		mutations.forEach(function (mutation) {
 			for (var i = 0; i < mutation.addedNodes.length; i++) {
@@ -91,16 +89,22 @@ function dcom_content_loaded_listener(e) {
 	});
 	e.target.ls_observer.observe(e.target, { childList: true, subtree: true });
 
+	// if event is for the current visible document, we have already
+	// received focus event and run an update for this document, even
+	// though it was not fully loaded. make sure it is updated again.
+	if (e.target == top_tab().document)
+		e.target.ls_history_version = -1;
+
 	make_visited_document_and_frames(top_tab());
 }
 
-function init(window) {
+function add_window(window) {
 	window.addEventListener("focus", focus_listener, true);
 	window.addEventListener("DOMContentLoaded", dcom_content_loaded_listener, true);
 	make_visited_document_and_frames(top_tab());
 }
 
-function deinit(window) {
+function remove_window(window) {
 	window.removeEventListener("focus", focus_listener, true);
 	window.removeEventListener("DOMContentLoaded", dcom_content_loaded_listener, true);
 }
@@ -112,7 +116,7 @@ var window_listener = {
 		function on_window_load() {
 			window.removeEventListener("load", on_window_load);
 			if (window.document.documentElement.getAttribute("windowtype") == "navigator:browser")
-				init(window);
+				add_window(window);
 		}
 		window.addEventListener("load", on_window_load);
 	},
@@ -142,18 +146,15 @@ function startup(data, reason) {
 	var history = Components.classes["@mozilla.org/browser/nav-history-service;1"].getService(Components.interfaces.nsINavHistoryService);
 	history.addObserver(history_observer, false);
 
-	for_each_open_window(init);
+	for_each_open_window(add_window);
 	Services.wm.addListener(window_listener);
 }
 
 function shutdown(data, reason) {
-	if (reason == APP_SHUTDOWN)
-		return;
-
 	var history = Components.classes["@mozilla.org/browser/nav-history-service;1"].getService(Components.interfaces.nsINavHistoryService);
 	history.removeObserver(history_observer);
 
-	for_each_open_window(deinit);
+	for_each_open_window(remove_window);
 	Services.wm.removeListener(window_listener);
 }
 
