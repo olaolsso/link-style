@@ -5,7 +5,10 @@
 
 <em:id>{f1328e8c-fe49-11e5-9a7a-0015f2381860}</em:id>
 <em:name>Link Style</em:name>
-<em:version>1</em:version>
+<em:version>2</em:version>
+<em:description>Dim all visited links to set them apart from non-visited links, regardless of any site-specific changes to the appearance of links.</em:description>
+<em:creator>Ola Olsson</em:creator>
+<em:homepageURL>https://github.com/olaolsso/link-style</em:homepageURL>
 <em:bootstrap>true</em:bootstrap>
   
 <em:targetApplication>
