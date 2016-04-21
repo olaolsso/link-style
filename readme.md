@@ -8,4 +8,4 @@ The resolution to a currently open bug report may end up solving this problem in
 
 ## Installation
 
-Install using the XPI file [Releases](https://github.com/olaolsso/link-style/releases). It is not yet signed so Firefox may warn you when you try to install it.
+[https://addons.mozilla.org/addon/link-style/](https://addons.mozilla.org/addon/link-style/)
